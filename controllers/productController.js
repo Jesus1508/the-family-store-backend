@@ -14,13 +14,45 @@ const uploadBufferToCloudinary = (buffer) =>
     stream.end(buffer);
   });
 
+const parseProductBody = (body) => {
+  const parsed = { ...body };
+
+  if (typeof parsed.tallas === "string") {
+    try {
+      parsed.tallas = JSON.parse(parsed.tallas);
+    } catch {
+      parsed.tallas = [];
+    }
+  }
+
+  if (typeof parsed.proximamente === "string") {
+    parsed.proximamente = parsed.proximamente === "true";
+  }
+
+  if (parsed.precioOriginal === "" || parsed.precioOriginal === undefined) {
+    delete parsed.precioOriginal;
+  }
+
+  return parsed;
+};
+
 exports.listProducts = async (req, res) => {
   try {
-    const { categoria, search, page = 1, limit = 20 } = req.query;
+    const { categoria, search, promocion, proximamente, page = 1, limit = 20 } = req.query;
     const filter = { activo: true };
 
     if (categoria) filter.categoria = categoria;
     if (search) filter.nombre = { $regex: search, $options: "i" };
+
+    if (proximamente === "true") {
+      filter.proximamente = true;
+    } else {
+      filter.proximamente = { $ne: true };
+    }
+
+    if (promocion === "true") {
+      filter.$expr = { $gt: ["$precioOriginal", "$precio"] };
+    }
 
     const products = await Product.find(filter)
       .sort({ createdAt: -1 })
@@ -58,7 +90,7 @@ exports.createProduct = async (req, res) => {
     const uploads = await Promise.all(files.map((file) => uploadBufferToCloudinary(file.buffer)));
     const imagenes = uploads.map((result) => ({ url: result.secure_url, publicId: result.public_id }));
 
-    const product = await Product.create({ ...req.body, imagenes });
+    const product = await Product.create({ ...parseProductBody(req.body), imagenes });
     res.status(201).json({ success: true, data: product });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error al crear el producto", error: error.message });
@@ -77,6 +109,8 @@ exports.updateProduct = async (req, res) => {
       return res.status(404).json({ success: false, message: "Producto no encontrado" });
     }
 
+    const body = parseProductBody(req.body);
+
     const files = req.files || [];
     if (files.length > 0) {
       const uploads = await Promise.all(files.map((file) => uploadBufferToCloudinary(file.buffer)));
@@ -85,10 +119,10 @@ exports.updateProduct = async (req, res) => {
       await Promise.all(
         product.imagenes.map((img) => cloudinary.uploader.destroy(img.publicId).catch(() => null))
       );
-      req.body.imagenes = nuevasImagenes;
+      body.imagenes = nuevasImagenes;
     }
 
-    Object.assign(product, req.body);
+    Object.assign(product, body);
     await product.save();
 
     res.json({ success: true, data: product });

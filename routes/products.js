@@ -3,14 +3,21 @@ const { body } = require("express-validator");
 const productController = require("../controllers/productController");
 const protectAdmin = require("../middleware/protectAdmin");
 const upload = require("../middleware/upload");
-const Product = require("../models/Product");
+const Category = require("../models/Category");
 
 const router = express.Router();
 
 const productValidators = [
   body("nombre").notEmpty().withMessage("El nombre es requerido"),
   body("precio").isFloat({ min: 0 }).withMessage("El precio debe ser un número positivo"),
-  body("categoria").isIn(Product.CATEGORIAS).withMessage("Categoría inválida"),
+  body("precioOriginal").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("El precio original debe ser un número positivo"),
+  body("categoria").custom(async (value) => {
+    const category = await Category.findOne({ slug: value, activa: true });
+    if (!category) {
+      throw new Error("Categoría inválida");
+    }
+    return true;
+  }),
   body("stock").optional().isInt({ min: 0 }).withMessage("El stock debe ser un entero positivo"),
   body("sku").notEmpty().withMessage("El SKU es requerido"),
 ];
