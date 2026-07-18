@@ -1,6 +1,7 @@
 const { validationResult } = require("express-validator");
 const Product = require("../models/Product");
 const cloudinary = require("../config/cloudinary");
+const { calcularReservado } = require("../utils/availability");
 
 const uploadBufferToCloudinary = (buffer) =>
   new Promise((resolve, reject) => {
@@ -27,6 +28,10 @@ const parseProductBody = (body) => {
 
   if (typeof parsed.proximamente === "string") {
     parsed.proximamente = parsed.proximamente === "true";
+  }
+
+  if (typeof parsed.eliminarAlAgotarse === "string") {
+    parsed.eliminarAlAgotarse = parsed.eliminarAlAgotarse === "true";
   }
 
   if (parsed.precioOriginal === "" || parsed.precioOriginal === undefined) {
@@ -73,7 +78,21 @@ exports.getProduct = async (req, res) => {
     if (!product) {
       return res.status(404).json({ success: false, message: "Producto no encontrado" });
     }
-    res.json({ success: true, data: product });
+
+    const reservadoTotal = await calcularReservado(product._id);
+    const data = product.toObject();
+    data.disponible = Math.max(0, product.stock - reservadoTotal);
+
+    if (product.tallas?.length > 0) {
+      data.tallas = await Promise.all(
+        product.tallas.map(async (t) => {
+          const reservadoTalla = await calcularReservado(product._id, t.talla);
+          return { ...t.toObject(), disponible: Math.max(0, t.stock - reservadoTalla) };
+        })
+      );
+    }
+
+    res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error al obtener el producto", error: error.message });
   }
@@ -131,6 +150,15 @@ exports.updateProduct = async (req, res) => {
   }
 };
 
+const deleteProductAndImages = async (product) => {
+  await Promise.all(
+    product.imagenes.map((img) => cloudinary.uploader.destroy(img.publicId).catch(() => null))
+  );
+  await product.deleteOne();
+};
+
+exports.deleteProductAndImages = deleteProductAndImages;
+
 exports.deleteProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -138,10 +166,7 @@ exports.deleteProduct = async (req, res) => {
       return res.status(404).json({ success: false, message: "Producto no encontrado" });
     }
 
-    await Promise.all(
-      product.imagenes.map((img) => cloudinary.uploader.destroy(img.publicId).catch(() => null))
-    );
-    await product.deleteOne();
+    await deleteProductAndImages(product);
 
     res.json({ success: true, message: "Producto eliminado" });
   } catch (error) {

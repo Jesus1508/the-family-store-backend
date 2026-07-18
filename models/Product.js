@@ -28,6 +28,7 @@ const productSchema = new mongoose.Schema(
     imagenes: { type: [imagenSchema], default: [] },
     tallas: { type: [tallaSchema], default: [] },
     proximamente: { type: Boolean, default: false },
+    eliminarAlAgotarse: { type: Boolean, default: false },
     activo: { type: Boolean, default: true },
   },
   { timestamps: true }
