@@ -17,7 +17,14 @@ const app = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5174",
+    origin: (origin, callback) => {
+      const isLocalhost = !origin || /^http:\/\/localhost:\d+$/.test(origin);
+      const isConfiguredFrontend = origin && origin === process.env.FRONTEND_URL;
+      if (isLocalhost || isConfiguredFrontend) {
+        return callback(null, true);
+      }
+      callback(new Error("No permitido por CORS"));
+    },
   })
 );
 app.use(express.json());
