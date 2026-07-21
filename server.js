@@ -11,6 +11,8 @@ const productRoutes = require("./routes/products");
 const categoryRoutes = require("./routes/categories");
 const settingsRoutes = require("./routes/settings");
 const orderRoutes = require("./routes/orders");
+const reviewRoutes = require("./routes/reviews");
+const adminRoutes = require("./routes/admins");
 
 const app = express();
 
@@ -46,6 +48,8 @@ app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/admins", adminRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

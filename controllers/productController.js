@@ -1,5 +1,6 @@
 const { validationResult } = require("express-validator");
 const Product = require("../models/Product");
+const Review = require("../models/Review");
 const cloudinary = require("../config/cloudinary");
 const { calcularReservado } = require("../utils/availability");
 
@@ -66,7 +67,21 @@ exports.listProducts = async (req, res) => {
 
     const total = await Product.countDocuments(filter);
 
-    res.json({ success: true, data: products, total, page: Number(page) });
+    const ratings = await Review.aggregate([
+      { $match: { producto: { $in: products.map((p) => p._id) }, aprobada: true } },
+      { $group: { _id: "$producto", promedio: { $avg: "$calificacion" }, total: { $sum: 1 } } },
+    ]);
+    const ratingsPorProducto = new Map(ratings.map((r) => [r._id.toString(), r]));
+
+    const data = products.map((p) => {
+      const rating = ratingsPorProducto.get(p._id.toString());
+      const obj = p.toObject();
+      obj.promedioCalificacion = rating?.promedio || 0;
+      obj.totalResenas = rating?.total || 0;
+      return obj;
+    });
+
+    res.json({ success: true, data, total, page: Number(page) });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error al listar productos", error: error.message });
   }
@@ -91,6 +106,13 @@ exports.getProduct = async (req, res) => {
         })
       );
     }
+
+    const reseñasAprobadas = await Review.find({ producto: product._id, aprobada: true });
+    data.totalResenas = reseñasAprobadas.length;
+    data.promedioCalificacion =
+      reseñasAprobadas.length > 0
+        ? reseñasAprobadas.reduce((sum, r) => sum + r.calificacion, 0) / reseñasAprobadas.length
+        : 0;
 
     res.json({ success: true, data });
   } catch (error) {

@@ -20,6 +20,18 @@ const orderSchema = new mongoose.Schema(
       email: { type: String, trim: true, lowercase: true },
     },
     metodoPago: { type: String, required: true, enum: ["transferencia", "deposito"] },
+    envio: {
+      solicitado: { type: Boolean, default: false },
+      costo: { type: Number, default: 0 },
+      direccion: {
+        calle: { type: String, trim: true },
+        numero: { type: String, trim: true },
+        colonia: { type: String, trim: true },
+        ciudad: { type: String, trim: true },
+        codigoPostal: { type: String, trim: true },
+        referencias: { type: String, trim: true },
+      },
+    },
     estado: {
       type: String,
       enum: ["pendiente_pago", "confirmado", "cancelado"],

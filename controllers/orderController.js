@@ -5,13 +5,26 @@ const Settings = require("../models/Settings");
 const { calcularReservado } = require("../utils/availability");
 const { deleteProductAndImages } = require("./productController");
 
+const COSTO_ENVIO_LOCAL = 60;
+
 exports.createOrder = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ success: false, errors: errors.array() });
   }
 
-  const { items, cliente, metodoPago } = req.body;
+  const { items, cliente, metodoPago, envio } = req.body;
+
+  if (envio?.solicitado) {
+    const dir = envio.direccion || {};
+    const camposFaltantes = ["calle", "numero", "colonia", "ciudad", "codigoPostal"].filter((campo) => !dir[campo]);
+    if (camposFaltantes.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Faltan datos de la dirección de envío: ${camposFaltantes.join(", ")}`,
+      });
+    }
+  }
 
   try {
     const itemsValidados = [];
@@ -52,10 +65,16 @@ exports.createOrder = async (req, res) => {
       total += product.precio * item.cantidad;
     }
 
+    const costoEnvio = envio?.solicitado ? COSTO_ENVIO_LOCAL : 0;
+    total += costoEnvio;
+
     const order = await Order.create({
       items: itemsValidados,
       cliente,
       metodoPago,
+      envio: envio?.solicitado
+        ? { solicitado: true, costo: costoEnvio, direccion: envio.direccion }
+        : { solicitado: false, costo: 0 },
       total,
     });
 

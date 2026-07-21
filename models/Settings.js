@@ -12,6 +12,7 @@ const settingsSchema = new mongoose.Schema(
     email: { type: String, default: "" },
     politicaCompra: { type: String, default: "" },
     quienesSomos: { type: String, default: "" },
+    mostrarResenasEnTarjetas: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
